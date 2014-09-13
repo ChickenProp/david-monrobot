@@ -64,9 +64,10 @@ dmrbGen iterations rounds = Bot run where
 multiExploit :: BotEnvironment m => Int -> Int -> Bot -> [Moves] -> m Choice
 multiExploit iterations rounds bot hist = do
   itsMoves <- replicateM iterations $ dumbBotsNextMove bot
-  movesAndScores <- mapM (exploit rounds bot hist) itsMoves
+  movesAndScores <- mapM doExploit itsMoves
   let (co, de) = avgScores movesAndScores
    in return $ if co > de then Cooperate else Defect
+  where doExploit = exploit (min rounds (99 - (length hist))) bot hist
 
 -- Int - number of rounds forward to predict
 -- Bot - opponent to try to exploit.
