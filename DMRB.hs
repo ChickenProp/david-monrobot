@@ -1,15 +1,20 @@
 -- My game plan is: against bots who try to simulate me, don't try to be clever,
--- just play titForTat. Against bots who don't try to simulate me, I can predict
--- their moves, so exploit them.
+-- just play tit-for-tat. Against bots who don't try to simulate me, I can
+-- predict their moves, so exploit them.
 
 --   Try not to take too long when simulating: bots who try to simulate me but
--- time out, might decide to defect against me on principle. Currently failing
--- at this.
+-- time out, might decide to defect against me on principle. I think it would be
+-- silly to do this with a time limit as low as 10000 μs, as recommended in the
+-- explanation, especially if `time` has an overhead close to that amount (which
+-- I don't observe myself, but it's not my computer that it'll be running
+-- on...). I give myself a limit of 18000 μs, and if that times out I go for the
+-- tit-for-tat option. I should always return within 20000 μs.
 
 --   Naturally, how well I do depends on the other bots in play. JusticeBot
--- fucks me over: we fall into (D,D) when other bots get (C,C) against ver
--- (potentially even (D,C), but I'm not sure what that bot would be doing). I'm
--- hoping JusticeBot gets eliminated early on.
+-- fucks me over, for example: we fall into (D,D) when other bots get (C,C)
+-- against ver (potentially even (D,C), but I'm not sure what that bot would be
+-- doing). I'm hoping JusticeBot gets eliminated early on, because as it stands,
+-- I'm not even winning the tournament with the toy bots.
 
 module DMRB where
 
@@ -56,36 +61,43 @@ uncooperativeBot = Bot run where
 
 -- Against a dumb opponent, work out how I can get the most amount of points.
 davidMonRoBot :: Bot
-davidMonRoBot = Bot run where
-  run op hist = do
-    itsMoves <- replicateM 9 $ dumbBotsNextMove op
-    movesAndScores <- mapM (\m -> exploit 5 op hist m) itsMoves
-    return $ fst $ head movesAndScores
+davidMonRoBot = dmrbGen 7 3
 
+-- 18000 means that I should at least always return a result to people who give
+-- me 20000.
+dmrbGen :: Int -> Int -> Bot
+dmrbGen iterations rounds = Bot run where
+  run op hist = do
+    move <- time 18000 $ multiExploit iterations rounds op hist
+    return $ case move of
+      (Just x) -> x
+      (Nothing) -> case hist of
+        [] -> Cooperate
+        xs -> snd $ last xs
+
+-- Run `exploit` some number of times, going some number of rounds deep, and
+-- return the move that has the best average results.
+--   (Currently doesn't do the average.)
+multiExploit :: BotEnvironment m => Int -> Int -> Bot -> [Moves] -> m Choice
+multiExploit iterations rounds bot hist = do
+  itsMoves <- replicateM iterations $ dumbBotsNextMove bot
+  movesAndScores <- mapM (exploit rounds bot hist) itsMoves
+  return $ fst $ head movesAndScores
 
 -- Int - number of rounds forward to predict
 -- Bot - opponent to try to exploit.
 -- [Moves] - history to start with.
--- Maybe Choice - Just (the move it's going to do next round), or Nothing.
+-- Choice - the move it's going to do next round.
 -- m (Choice, Int) - my best move, and how many points I expect from it.
 exploit :: BotEnvironment m =>
-    Int -> Bot -> [Moves] -> Maybe Choice -> m (Choice, Int)
+    Int -> Bot -> [Moves] -> Choice -> m (Choice, Int)
 
--- If I can't work out what it's going to do, run titForTat. If we mix calls
--- with Nothing to calls with (Just m), then the Nothing calls will have
--- slightly lower scores, on average. But we shouldn't be mixing those,
--- hopefully.
-exploit n bot hist Nothing
-  = do
-    choice <- runBot titForTatBot bot hist
-    return (choice, snd $ totalScores hist)
-
-exploit 0 bot hist (Just itsMove)
+exploit 0 bot hist itsMove
   = return (Defect, fst $ totalScores $ hist ++ [(Defect, itsMove)])
 
--- The normal case: work out what it's going to do next round for each of my
--- moves this round, and recurse to find out which one is better for me.
-exploit rounds bot hist (Just itsMove)
+-- Work out what it's going to do next round for each of my possible moves this
+-- round, and recurse to find out which one is better for me.
+exploit rounds bot hist itsMove
   = do
     itsNextMoveCo <- runBot bot cooperateBot $ invert $ withMove Cooperate
     itsNextMoveDe <- runBot bot cooperateBot $ invert $ withMove Defect
@@ -98,7 +110,7 @@ exploit rounds bot hist (Just itsMove)
       else return (Defect, scoreDe)
 
   where withMove m = hist ++ [(m, itsMove)]
-        recurse me you = exploit (rounds - 1) bot (withMove me) (Just you)
+        recurse me you = exploit (rounds - 1) bot (withMove me) you
 
 
 avgScores :: (Integral a, Fractional b) => [(Choice, a)] -> (b, b)
@@ -109,8 +121,6 @@ avgScores xs = let ((c,d), (nc,nd)) = agg' (0,0) (0, 0) xs
         agg' (c,d) (nc,nd) ((Cooperate, s) : xs) = agg' (c+s, d) (nc+1, nd) xs
         agg' (c,d) (nc,nd) ((Defect, s) : xs) = agg' (c, d+s) (nc, nd+1) xs
 
--- against randombot, simulating more levels deep makes the results less useful.
-
 -- Run forever.
 timeoutBot :: Bot
 timeoutBot = Bot run where
@@ -119,8 +129,8 @@ timeoutBot = Bot run where
     return Cooperate
   infiniteLoop = infiniteLoop
 
-dumbBotsNextMove :: BotEnvironment m => Bot -> m (Maybe Choice)
-dumbBotsNextMove bot = time 500 $ runBot bot timeoutBot []
+dumbBotsNextMove :: BotEnvironment m => Bot -> m Choice
+dumbBotsNextMove bot = runBot bot timeoutBot []
 
 isBotClever :: BotEnvironment m => Bot -> m Bool
 isBotClever bot = do
