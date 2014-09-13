@@ -16,6 +16,11 @@
 -- doing). I'm hoping JusticeBot gets eliminated early on, because as it stands,
 -- I'm not even winning the tournament with the toy bots.
 
+--   I also frequently cooperate against randomBot, which is bad. I expect
+-- randomBot and anything like it to go quickly, and it's only an expected
+-- difference of 1.5pts/round when I do so, but still. If I spent more time
+-- simulating, I would cooperate less.
+
 module DMRB where
 
 import Bots
@@ -36,28 +41,6 @@ timeIt ioa = do
     t2 <- getCPUTime
     printf "CPU time: %d\n" $ (t2-t1) `div` (10^6)
     return a
-
--- Simulate my opponent playing a round against me, and do the opposite of
--- whatever my opponent does. Limit my opponent to 10ms, cooperate if they go
--- over. Someone on LW wrote this.
-trollBot :: Bot
-trollBot = Bot run where
-  run op hist = do
-    simulation <- time 10000 . runBot op trollBot $ invert hist
-    return (case simulation of
-              Nothing -> Cooperate
-              Just Cooperate -> Defect
-              Just Defect -> Cooperate)
-
--- Defect against bots that are trying to simulate me. Cooperate against
--- everyone else.
-uncooperativeBot :: Bot
-uncooperativeBot = Bot run where
-  run op hist = do
-    clever <- isBotClever op
-    case clever of
-      True -> return Defect
-      False -> return Cooperate
 
 -- Against a dumb opponent, work out how I can get the most amount of points.
 davidMonRoBot :: Bot
@@ -82,7 +65,8 @@ multiExploit :: BotEnvironment m => Int -> Int -> Bot -> [Moves] -> m Choice
 multiExploit iterations rounds bot hist = do
   itsMoves <- replicateM iterations $ dumbBotsNextMove bot
   movesAndScores <- mapM (exploit rounds bot hist) itsMoves
-  return $ fst $ head movesAndScores
+  let (co, de) = avgScores movesAndScores
+   in return $ if co > de then Cooperate else Defect
 
 -- Int - number of rounds forward to predict
 -- Bot - opponent to try to exploit.
@@ -121,6 +105,11 @@ avgScores xs = let ((c,d), (nc,nd)) = agg' (0,0) (0, 0) xs
         agg' (c,d) (nc,nd) ((Cooperate, s) : xs) = agg' (c+s, d) (nc+1, nd) xs
         agg' (c,d) (nc,nd) ((Defect, s) : xs) = agg' (c, d+s) (nc, nd+1) xs
 
+-- If my opponent is dumb, find their next move. If my opponent is not dumb, run
+-- forever.
+dumbBotsNextMove :: BotEnvironment m => Bot -> m Choice
+dumbBotsNextMove bot = runBot bot timeoutBot []
+
 -- Run forever.
 timeoutBot :: Bot
 timeoutBot = Bot run where
@@ -128,13 +117,3 @@ timeoutBot = Bot run where
     infiniteLoop
     return Cooperate
   infiniteLoop = infiniteLoop
-
-dumbBotsNextMove :: BotEnvironment m => Bot -> m Choice
-dumbBotsNextMove bot = runBot bot timeoutBot []
-
-isBotClever :: BotEnvironment m => Bot -> m Bool
-isBotClever bot = do
-  sim <- time 500 $ runBot bot timeoutBot []
-  case sim of
-    Nothing -> return True
-    Just _ -> return False
