@@ -98,9 +98,9 @@ exploit rounds bot hist itsMove
 
 
 avgScores :: (Integral a, Fractional b) => [(Choice, a)] -> (b, b)
-avgScores xs = let ((c,d), (nc,nd)) = agg' (0,0) (0, 0) xs
-                in ((fromIntegral c)/(fromIntegral nc),
-                    (fromIntegral d)/(fromIntegral nd))
+avgScores xs = let ((c,d), (nc,nd)) = agg' (0, 0) (0, 0) xs
+                in ((fromIntegral c)/(fromIntegral $ max nc 1),
+                    (fromIntegral d)/(fromIntegral $ max nd 1))
   where agg' (c,d) (nc,nd) [] = ((c,d), (nc,nd))
         agg' (c,d) (nc,nd) ((Cooperate, s) : xs) = agg' (c+s, d) (nc+1, nd) xs
         agg' (c,d) (nc,nd) ((Defect, s) : xs) = agg' (c, d+s) (nc, nd+1) xs
