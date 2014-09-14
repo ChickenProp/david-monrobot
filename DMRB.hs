@@ -42,7 +42,6 @@ timeIt ioa = do
     printf "CPU time: %d\n" $ (t2-t1) `div` (10^6)
     return a
 
--- Against a dumb opponent, work out how I can get the most amount of points.
 davidMonRoBot :: Bot
 davidMonRoBot = dmrbGen 7 3
 
@@ -63,7 +62,7 @@ dmrbGen iterations rounds = Bot run where
 --   (Currently doesn't do the average.)
 multiExploit :: BotEnvironment m => Int -> Int -> Bot -> [Moves] -> m Choice
 multiExploit iterations rounds bot hist = do
-  itsMoves <- replicateM iterations $ dumbBotsNextMove bot
+  itsMoves <- replicateM iterations $ dumbBotsNextMove bot hist
   movesAndScores <- mapM doExploit itsMoves
   let (co, de) = avgScores movesAndScores
    in return $ if co > de then Cooperate else Defect
@@ -108,8 +107,8 @@ avgScores xs = let ((c,d), (nc,nd)) = agg' (0, 0) (0, 0) xs
 
 -- If my opponent is dumb, find their next move. If my opponent is not dumb, run
 -- forever.
-dumbBotsNextMove :: BotEnvironment m => Bot -> m Choice
-dumbBotsNextMove bot = runBot bot timeoutBot []
+dumbBotsNextMove :: BotEnvironment m => Bot -> [Moves] -> m Choice
+dumbBotsNextMove bot hist = runBot bot timeoutBot hist
 
 -- Run forever.
 timeoutBot :: Bot
