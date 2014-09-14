@@ -27,20 +27,10 @@ import Bots
 import Tournament
 
 import Control.Monad (replicateM)
+
+-- Only used in `timeIt`, which is only used for testing.
 import System.CPUTime (getCPUTime)
 import Text.Printf (printf)
-
--- Wrap an 'IO' computation so that it prints execution time in
--- microseconds. System.TimeIt provides this, but uses seconds. This isn't used
--- in my bot at all, I just want it for testing.
-
-timeIt :: IO a -> IO a
-timeIt ioa = do
-    t1 <- getCPUTime
-    a <- ioa
-    t2 <- getCPUTime
-    printf "CPU time: %d\n" $ (t2-t1) `div` (10^6)
-    return a
 
 davidMonRoBot :: Bot
 davidMonRoBot = dmrbGen 7 3
@@ -110,10 +100,21 @@ avgScores xs = let ((c,d), (nc,nd)) = agg' (0, 0) (0, 0) xs
 dumbBotsNextMove :: BotEnvironment m => Bot -> [Moves] -> m Choice
 dumbBotsNextMove bot hist = runBot bot timeoutBot hist
 
--- Run forever.
+-- Run forever. This is not the bot you're looking for.
 timeoutBot :: Bot
 timeoutBot = Bot run where
   run op hist = do
     infiniteLoop
     return Cooperate
   infiniteLoop = infiniteLoop
+
+-- Wrap an 'IO' computation so that it prints execution time in
+-- microseconds. System.TimeIt provides this, but uses seconds. This isn't used
+-- in my bot at all, I just want it for testing.
+timeIt :: IO a -> IO a
+timeIt ioa = do
+    t1 <- getCPUTime
+    a <- ioa
+    t2 <- getCPUTime
+    printf "CPU time: %d\n" $ (t2-t1) `div` (10^6)
+    return a
