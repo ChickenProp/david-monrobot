@@ -1,3 +1,9 @@
+This was my entry into the Program Equilibrium Iterated Prisoner's Dilemma
+Tournament; see the remainder of this README for details of that. My bot is
+named "David MonRoBot" and came joint first; see DMRB.hs for details about ver
+(including source). The tournament took place in 2014, but I'm uploading this to
+github in 2017 because I was recently reminded of it.
+
 ## Program Equilibrium Iterated Prisoner's Dilemma Tournament ##
 
 **The tournament is now closed; see [this
